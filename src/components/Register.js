@@ -1,6 +1,8 @@
 import React, { useState } from "react";
 import styled from "styled-components";
 import { useNavigate, Link } from "react-router-dom";
+import AuthService from "../services/auth.service"; // Adjust the import path as needed
+import { isEmail } from "validator";
 
 const RegisterContainer = styled.div`
   display: flex;
@@ -64,33 +66,56 @@ const LinkText = styled.p`
   }
 `;
 
+const ErrorText = styled.p`
+  color: red;
+  font-size: 12px;
+  margin: 5px 0 0;
+`;
+
 const Register = () => {
-  const [name, setName] = useState("");
+  const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [error, setError] = useState("");
+  const [errors, setErrors] = useState({});
+  const [message, setMessage] = useState("");
+  const [successful, setSuccessful] = useState(false);
   const navigate = useNavigate();
 
   const handleRegister = async (e) => {
     e.preventDefault();
-    setError("");
+    setMessage("");
+    setErrors({});
+    setSuccessful(false);
+
+    // Validate username
+    if (username.length < 3 || username.length > 20) {
+      setErrors((prev) => ({ ...prev, username: "Username must be between 3 and 20 characters." }));
+      return;
+    }
+
+    // Validate email
+    if (!isEmail(email)) {
+      setErrors((prev) => ({ ...prev, email: "Invalid email address." }));
+      return;
+    }
+
+    // Validate password
+    if (password.length < 6 || password.length > 40) {
+      setErrors((prev) => ({ ...prev, password: "Password must be between 6 and 40 characters." }));
+      return;
+    }
 
     try {
-      const response = await fetch("http://localhost:5000/api/register", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, email, password }),
-      });
-
-      const data = await response.json();
-      if (response.ok) {
-        alert("Registration successful!");
-        navigate("/login");
-      } else {
-        setError(data.message);
-      }
+      const response = await AuthService.register(username, email, password);
+      setMessage(response.data.message);
+      setSuccessful(true);
     } catch (error) {
-      setError("An error occurred. Please try again.");
+      const resMessage =
+        (error.response && error.response.data && error.response.data.message) ||
+        error.message ||
+        error.toString();
+      setMessage(resMessage);
+      setSuccessful(false);
     }
   };
 
@@ -98,15 +123,16 @@ const Register = () => {
     <RegisterContainer>
       <RegisterBox>
         <Title>Register</Title>
-        {error && <p style={{ color: "red" }}>{error}</p>}
+        {message && <p style={{ color: successful ? "green" : "red" }}>{message}</p>}
         <form onSubmit={handleRegister}>
           <Input
             type="text"
-            placeholder="Enter your name"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
+            placeholder="Enter your username"
+            value={username}
+            onChange={(e) => setUsername(e.target.value)}
             required
           />
+          {errors.username && <ErrorText>{errors.username}</ErrorText>}
           <Input
             type="email"
             placeholder="Enter your email"
@@ -114,6 +140,7 @@ const Register = () => {
             onChange={(e) => setEmail(e.target.value)}
             required
           />
+          {errors.email && <ErrorText>{errors.email}</ErrorText>}
           <Input
             type="password"
             placeholder="Enter your password"
@@ -121,6 +148,7 @@ const Register = () => {
             onChange={(e) => setPassword(e.target.value)}
             required
           />
+          {errors.password && <ErrorText>{errors.password}</ErrorText>}
           <Button type="submit">Register</Button>
         </form>
         <LinkText>
